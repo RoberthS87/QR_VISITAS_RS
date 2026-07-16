@@ -1,0 +1,1 @@
+# QR_VISITAS_RS
