@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Bitácora de Seguridad Digital</title>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f172a;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+}
+
+.container{
+    width:100%;
+    max-width:1400px;
+    background:#ffffff;
+    border-radius:20px;
+    overflow:hidden;
+    box-shadow:0 10px 40px rgba(0,0,0,.35);
+}
+
+.header{
+    background:linear-gradient(135deg,#0057d8,#003a8c);
+    color:white;
+    padding:25px;
+    text-align:center;
+}
+
+.header h1{
+    font-size:34px;
+    margin-bottom:5px;
+}
+
+.header p{
+    opacity:.9;
+    font-size:16px;
+}
+
+.contenido{
+    display:flex;
+    min-height:650px;
+}
+
+.camara{
+    width:35%;
+    padding:25px;
+    border-right:2px solid #e5e7eb;
+    background:#f8fafc;
+}
+
+.camara h2{
+    color:#003a8c;
+    margin-bottom:15px;
+    text-align:center;
+}
+
+#reader{
+    width:100%;
+}
+
+.resultado-panel{
+    width:65%;
+    padding:30px;
+    background:white;
+}
+
+.estado-barra{
+    background:#1e293b;
+    color:white;
+    padding:15px;
+    border-radius:10px;
+    text-align:center;
+    font-size:22px;
+    font-weight:bold;
+    margin-bottom:25px;
+}
+
+#resultado{
+    display:none;
+    padding:25px;
+    border-radius:15px;
+}
+
+.autorizado{
+    background:#ecfdf5;
+    border-left:10px solid #16a34a;
+}
+
+.vencido{
+    background:#fef2f2;
+    border-left:10px solid #dc2626;
+}
+
+.estado{
+    text-align:center;
+    font-size:42px;
+    font-weight:bold;
+    margin-bottom:25px;
+}
+
+.autorizado .estado{
+    color:#15803d;
+}
+
+.vencido .estado{
+    color:#b91c1c;
+}
+
+.info{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+}
+
+.card{
+    background:white;
+    border:1px solid #dbeafe;
+    border-radius:12px;
+    padding:15px;
+}
+
+.label{
+    font-size:13px;
+    color:#64748b;
+    margin-bottom:5px;
+}
+
+.valor{
+    font-size:22px;
+    font-weight:bold;
+    color:#0f172a;
+}
+
+.codigo{
+    color:#003a8c;
+}
+
+.vencimiento{
+    color:#dc2626;
+}
+
+.mensaje{
+    margin-top:20px;
+    font-size:22px;
+    text-align:center;
+    font-weight:600;
+}
+
+@media(max-width:900px){
+
+    .contenido{
+        flex-direction:column;
+    }
+
+    .camara{
+        width:100%;
+        border-right:none;
+        border-bottom:2px solid #e5e7eb;
+    }
+
+    .resultado-panel{
+        width:100%;
+    }
+
+    .info{
+        grid-template-columns:1fr;
+    }
+
+    .estado{
+        font-size:30px;
+    }
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1>🛡️ BITÁCORA DE SEGURIDAD DIGITAL</h1>
+        <p>Control de Accesos y Validación de Pases QR</p>
+    </div>
+
+    <div class="contenido">
+
+        <div class="camara">
+
+            <h2>📷 Escáner QR</h2>
+
+            <div id="reader"></div>
+
+        </div>
+
+        <div class="resultado-panel">
+
+            <div class="estado-barra">
+                ESTADO DEL ACCESO
+            </div>
+
+            <div id="resultado"></div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+const APPS_SCRIPT =
+"https://script.google.com/macros/s/AKfycbyaNO70btirEjvYNL_CdvgO-3zEYRtfrPZfQgHIrD_zlbm1zXFfv_KsbVUkhA84fV6L/exec";
+
+let html5QrcodeScanner;
+
+function sonido(tipo){
+
+    const ctx = new(window.AudioContext || window.webkitAudioContext)();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.frequency.value =
+    tipo === "ok" ? 900 : 250;
+
+    osc.start();
+
+    setTimeout(()=>{
+        osc.stop();
+    },300);
+}
+
+function iniciarScanner(){
+
+    html5QrcodeScanner =
+    new Html5QrcodeScanner(
+        "reader",
+        {
+            fps:10,
+            qrbox:280
+        },
+        false
+    );
+
+    html5QrcodeScanner.render(onScanSuccess);
+}
+
+function mostrarResultado(data,codigo){
+
+    let clase =
+    data.estado === "AUTORIZADO"
+    ? "autorizado"
+    : "vencido";
+
+    sonido(
+        data.estado === "AUTORIZADO"
+        ? "ok"
+        : "error"
+    );
+
+    document.getElementById("resultado").className = clase;
+    document.getElementById("resultado").style.display = "block";
+
+    document.getElementById("resultado").innerHTML = `
+
+        <div class="estado">
+            ${data.mensaje}
+        </div>
+
+        <div class="info">
+
+            <div class="card">
+                <div class="label">VISITANTE</div>
+                <div class="valor">${data.nombre}</div>
+            </div>
+
+            <div class="card">
+                <div class="label">CÉDULA</div>
+                <div class="valor">${data.identificacion}</div>
+            </div>
+
+            <div class="card">
+                <div class="label">VEHÍCULO</div>
+                <div class="valor">${data.placa}</div>
+            </div>
+
+            <div class="card">
+                <div class="label">AUTORIZADO POR</div>
+                <div class="valor">${data.autorizadoPor || "-"}</div>
+            </div>
+
+            <div class="card">
+                <div class="label">CÓDIGO QR</div>
+                <div class="valor codigo">${codigo}</div>
+            </div>
+
+            <div class="card">
+                <div class="label">VENCIMIENTO</div>
+                <div class="valor vencimiento">${data.vence}</div>
+            </div>
+
+        </div>
+
+        <div class="mensaje">
+
+            ${
+                data.estado === "AUTORIZADO"
+                ? "El visitante se encuentra habilitado para ingresar a las instalaciones."
+                : "El acceso no se encuentra autorizado."
+            }
+
+        </div>
+
+    `;
+}
+
+function onScanSuccess(codigo){
+
+    html5QrcodeScanner.clear();
+
+    // Modificamos la petición para manejar correctamente la redirección de Google
+    fetch(
+        APPS_SCRIPT +
+        "?accion=validarQR&codigo=" +
+        encodeURIComponent(codigo),
+        {
+            method: 'GET',
+            mode: 'cors', // Permite la comunicación cruzada estándar
+            redirect: 'follow' // OBLIGATORIO: Google siempre redirecciona la Web App (/exec -> /redirect)
+        }
+    )
+    .then(r => {
+        if (!r.ok) {
+            throw new Error("Respuesta de red no exitosa");
+        }
+        return r.json();
+    })
+    .then(data => {
+
+        mostrarResultado(data,codigo);
+
+        setTimeout(()=>{
+
+            document.getElementById("reader").innerHTML = "";
+
+            iniciarScanner();
+
+        },4000);
+
+    })
+    .catch(error => {
+
+        console.error("Detalle del fallo:", error);
+
+        document.getElementById("resultado").className = "vencido"; // Aplicamos color rojo de error
+        document.getElementById("resultado").style.display = "block";
+
+        document.getElementById("resultado").innerHTML = `
+            <div class="estado" style="color: #b91c1c;">
+                🔴 ERROR DE CONEXIÓN
+            </div>
+            <div class="mensaje" style="font-size: 16px; margin-top: 10px; color: #475569;">
+                No fue posible comunicarse con el servidor de la Bitácora.<br>
+                <small style="color: #94a3b8; font-size: 12px;">Verifica que la Web App de Google esté publicada para "Cualquiera" y que la URL coincida.</small>
+            </div>
+        `;
+
+        // Reiniciamos el escáner automáticamente tras un error para que no se quede congelado
+        setTimeout(()=>{
+            document.getElementById("reader").innerHTML = "";
+            iniciarScanner();
+        }, 5000);
+    });
+
+}
+
+iniciarScanner();
+
+</script>
+
+</body>
+</html>
